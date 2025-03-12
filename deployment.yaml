@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ayyuce-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ayyuce-server
+  template:
+    metadata:
+      labels:
+        app: ayyuce-server
+        ai.gke.io/model: ayyuce.SmolGRPO-135M
+        ai.gke.io/inference-server: text-generation-inference
+        examples.ai.gke.io/source: model-garden
+    spec:
+      containers:
+      - name: inference-server
+        image: us-docker.pkg.dev/deeplearning-platform-release/gcr.io/huggingface-text-generation-inference-cu124.2-4.ubuntu2204.py311
+        resources:
+          requests:
+            cpu: 9
+            memory: 34Gi
+            ephemeral-storage: 80Gi
+            nvidia.com/gpu : 1
+          limits:
+            cpu: 9
+            memory: 34Gi
+            ephemeral-storage: 80Gi
+            nvidia.com/gpu : 1
+        env:
+        - name: MAX_INPUT_LENGTH
+          value: "1024"
+        - name: MAX_TOTAL_TOKENS
+          value: "2048"
+        - name: MAX_BATCH_PREFILL_TOKENS
+          value: "2048"
+        - name: CUDA_MEMORY_FRACTION
+          value: "0.93"
+        - name: JSON_OUTPUT
+          value: "true"
+        - name: MODEL_ID
+          value: "ayyuce/SmolGRPO-135M"
+        - name: REVISION
+          value: "38101dab8d4e13c53f7cccc2f02bdcf30339732f"
+        - name: DEPLOY_SOURCE
+          value: "UI_HF_VERIFIED_MODEL"
+        - name: NUM_SHARD
+          value: "1"
+        volumeMounts:
+        - mountPath: /dev/shm
+          name: dshm
+      volumes:
+      - name: dshm
+        emptyDir:
+          medium: Memory
+      nodeSelector:
+        cloud.google.com/gke-accelerator: nvidia-l4
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: ayyuce-service
+spec:
+  selector:
+    app: ayyuce-server
+  type: ClusterIP
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8080
